@@ -11,15 +11,15 @@ Only edit files under `items/` on the data branch. Every file there becomes a po
 
 1. Check out the data branch next to this repo:
    ```bash
-   git fetch origin claude/live-data
+   git fetch origin claude/live-data:claude/live-data
    git worktree add ../data claude/live-data
    ```
-2. Install dependencies, then collect documents published in the last 3 days that are not on the map yet:
+2. Install dependencies, then collect documents published since the newest item on the map (3 to 21 days back) that are not on the map yet:
    ```bash
    pip install -q requests trafilatura
-   python3 scripts/live_collect.py --data ../data --days 3
+   python3 scripts/live_collect.py --data ../data
    ```
-   This writes `work/to_code.jsonl`. `GUARDIAN_API_KEY` and `DATA_GOV_API_KEY` are optional environment variables; without them, The Guardian and Congress are skipped. If no new documents turn up, stop here and report that.
+   This writes `work/to_code.jsonl`. `GUARDIAN_API_KEY`, `DATA_GOV_API_KEY` and `FIRECRAWL_API_KEY` are optional environment variables. Without them, The Guardian, Congress and the pages that block plain fetching (e.g. OpenAI) are skipped. If no new documents turn up, stop here and report that.
 3. Code every line of `work/to_code.jsonl` following `scripts/live_prompt.md` and `scripts/harmonize_prompt.md`, and write `work/coded.jsonl`. Read each document's text; do not code from the title. Work in chunks of about 10 and append as you go.
 4. Validate, fix and publish:
    ```bash
