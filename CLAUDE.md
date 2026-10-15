@@ -7,7 +7,9 @@ This repo keeps a Latent Lab map of AI discourse up to date. The map has three l
 
 Only edit files under `items/` on the data branch. Every file there becomes a point on the map.
 
-## Daily update (what the scheduled routine does)
+## Daily update
+
+The workflow `.github/workflows/daily-update.yml` runs this every day at 10:00 UTC on GitHub Actions. Claude does step 3 through `anthropics/claude-code-action`, logged in with the `CLAUDE_CODE_OAUTH_TOKEN` secret. To run it by hand, open the Actions tab and choose Run workflow. Use the steps below for a manual or local run.
 
 1. Check out the data branch next to this repo:
    ```bash

@@ -1,0 +1,100 @@
+# Daily update of the live frontier AI discourse map (Latent Lab #715).
+# Collects new company / news / policy documents, has Claude write the masked topic
+# descriptions (scripts/live_prompt.md), validates them, and pushes items to claude/live-data.
+#
+# Secrets (Settings > Secrets and variables > Actions):
+#   CLAUDE_CODE_OAUTH_TOKEN  required: run `claude setup-token` (uses your Claude plan, no API key)
+#   GUARDIAN_API_KEY, DATA_GOV_API_KEY, FIRECRAWL_API_KEY  optional: missing ones skip those sources
+name: Daily live map update
+
+on:
+  schedule:
+    - cron: "0 10 * * *"   # 6am New York (EDT)
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Look-back in days (empty = since the newest item on the map)"
+        required: false
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: live-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -q requests trafilatura
+
+      - name: Check out the data branch
+        run: |
+          git fetch origin claude/live-data:claude/live-data
+          git worktree add data claude/live-data
+
+      - name: Collect new documents
+        shell: bash
+        env:
+          GUARDIAN_API_KEY: ${{ secrets.GUARDIAN_API_KEY }}
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+        run: |
+          python -u scripts/live_collect.py --data data ${{ inputs.days && format('--days {0}', inputs.days) || '' }} 2>&1 | tee work_collect.log
+          echo "n=$(wc -l < work/to_code.jsonl | tr -d ' ')" >> "$GITHUB_OUTPUT"
+        id: collect
+
+      - name: Code new documents with Claude
+        if: steps.collect.outputs.n != '0'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --model claude-sonnet-5-5
+            --max-turns 200
+            --allowedTools Read,Write,Edit,Glob,Grep,Bash(python3 scripts/live_publish.py:*),Bash(python scripts/live_publish.py:*),Bash(wc:*),Bash(head:*)
+          prompt: |
+            You are coding new documents for a research map of AI discourse.
+            Read scripts/live_prompt.md and scripts/harmonize_prompt.md first and follow them exactly.
+            Input: work/to_code.jsonl (${{ steps.collect.outputs.n }} documents). Output: work/coded.jsonl,
+            one JSON line per input id. Read each document's text; do not code from the title.
+            Work in chunks of about 10 documents and append to work/coded.jsonl as you go.
+            Then run `python3 scripts/live_publish.py --data data --check` and fix every reported
+            problem by rewriting the affected lines, until the check passes.
+            Do not edit anything except work/coded.jsonl. Do not commit or push.
+
+      - name: Publish items
+        if: steps.collect.outputs.n != '0'
+        run: python scripts/live_publish.py --data data
+
+      - name: Commit and push the data branch
+        if: steps.collect.outputs.n != '0'
+        run: |
+          cd data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add items
+          if git diff --cached --quiet; then echo "nothing new to publish"; exit 0; fi
+          n=$(git diff --cached --name-only | wc -l | tr -d ' ')
+          git commit -q -m "live update $(date -u +%F): $n items"
+          git push origin claude/live-data
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Live map update $(date -u +%F)"
+            echo '```'
+            grep -E "^\[(live|firecrawl|extract|company|layers)\]|^!|failed|missing|skipped" work_collect.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
