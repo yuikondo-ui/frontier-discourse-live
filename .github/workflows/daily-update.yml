@@ -79,7 +79,11 @@ jobs:
 
       - name: Commit and push the data branch
         if: steps.collect.outputs.n != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          # claude-code-action rewrites the remote URL with a short-lived token; restore our own
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           cd data
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -88,6 +92,18 @@ jobs:
           n=$(git diff --cached --name-only | wc -l | tr -d ' ')
           git commit -q -m "live update $(date -u +%F): $n items"
           git push origin claude/live-data
+
+      - name: Keep the coded batch (for recovery if a later step fails)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: work-${{ github.run_id }}
+          path: |
+            work/to_code.jsonl
+            work/coded.jsonl
+            work_collect.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Summary
         if: always()
