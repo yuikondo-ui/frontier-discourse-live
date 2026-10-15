@@ -1,0 +1,17 @@
+# Manual check that the Claude login works in Actions (no collection, a few seconds).
+name: Claude smoke test
+on: workflow_dispatch
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --model claude-sonnet-5-5 --max-turns 2
+          show_full_output: true
+          prompt: Reply with the single word OK.

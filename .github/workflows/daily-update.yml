@@ -62,7 +62,7 @@ jobs:
           claude_args: >-
             --model claude-sonnet-5-5
             --max-turns 200
-            --allowedTools Read,Write,Edit,Glob,Grep,Bash(python3 scripts/live_publish.py:*),Bash(python scripts/live_publish.py:*),Bash(wc:*),Bash(head:*)
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(python3 scripts/live_publish.py:*),Bash(python scripts/live_publish.py:*),Bash(wc:*),Bash(head:*)"
           prompt: |
             You are coding new documents for a research map of AI discourse.
             Read scripts/live_prompt.md and scripts/harmonize_prompt.md first and follow them exactly.
